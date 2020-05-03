@@ -54,6 +54,11 @@
             this.androidStudioTextbox = new System.Windows.Forms.TextBox();
             this.studioAskButton = new System.Windows.Forms.Button();
             this.removeConfigButton = new System.Windows.Forms.Button();
+            this.progressBar = new System.Windows.Forms.ProgressBar();
+            this.progressLabel = new System.Windows.Forms.Label();
+            this.killJavaButton = new System.Windows.Forms.Button();
+            this.heyHintLabel = new System.Windows.Forms.Label();
+            this.versionLabel = new System.Windows.Forms.Label();
             this.SuspendLayout();
             // 
             // TutorialLabel
@@ -177,6 +182,8 @@
             // checkBoxBackup
             // 
             this.checkBoxBackup.AutoSize = true;
+            this.checkBoxBackup.Checked = true;
+            this.checkBoxBackup.CheckState = System.Windows.Forms.CheckState.Checked;
             this.checkBoxBackup.Location = new System.Drawing.Point(88, 188);
             this.checkBoxBackup.Name = "checkBoxBackup";
             this.checkBoxBackup.Size = new System.Drawing.Size(337, 17);
@@ -202,6 +209,7 @@
             this.LogBox.Size = new System.Drawing.Size(776, 170);
             this.LogBox.TabIndex = 14;
             this.LogBox.Text = "";
+            this.LogBox.TextChanged += new System.EventHandler(this.LogBox_TextChanged);
             // 
             // label1
             // 
@@ -211,7 +219,7 @@
             this.label1.Size = new System.Drawing.Size(78, 13);
             this.label1.TabIndex = 21;
             this.label1.Text = "A. Studio Path:";
-            this.hintTooltip.SetToolTip(this.label1, "Android Studio path.");
+            this.hintTooltip.SetToolTip(this.label1, "(Optional) Android Studio path.");
             // 
             // ClearLogButton
             // 
@@ -284,11 +292,61 @@
             this.removeConfigButton.UseVisualStyleBackColor = true;
             this.removeConfigButton.Click += new System.EventHandler(this.removeConfigButton_Click);
             // 
+            // progressBar
+            // 
+            this.progressBar.Location = new System.Drawing.Point(12, 223);
+            this.progressBar.Name = "progressBar";
+            this.progressBar.Size = new System.Drawing.Size(265, 23);
+            this.progressBar.TabIndex = 23;
+            // 
+            // progressLabel
+            // 
+            this.progressLabel.AutoSize = true;
+            this.progressLabel.Location = new System.Drawing.Point(12, 204);
+            this.progressLabel.Name = "progressLabel";
+            this.progressLabel.Size = new System.Drawing.Size(51, 13);
+            this.progressLabel.TabIndex = 24;
+            this.progressLabel.Text = "Progress:";
+            // 
+            // killJavaButton
+            // 
+            this.killJavaButton.Location = new System.Drawing.Point(283, 222);
+            this.killJavaButton.Name = "killJavaButton";
+            this.killJavaButton.Size = new System.Drawing.Size(72, 23);
+            this.killJavaButton.TabIndex = 25;
+            this.killJavaButton.Text = "Kill java.exe";
+            this.killJavaButton.UseVisualStyleBackColor = true;
+            this.killJavaButton.Click += new System.EventHandler(this.killJavaButton_Click);
+            // 
+            // heyHintLabel
+            // 
+            this.heyHintLabel.AutoSize = true;
+            this.heyHintLabel.Location = new System.Drawing.Point(478, 9);
+            this.heyHintLabel.Name = "heyHintLabel";
+            this.heyHintLabel.Size = new System.Drawing.Size(310, 13);
+            this.heyHintLabel.TabIndex = 26;
+            this.heyHintLabel.Text = "You can hover your mouse on some labels to see additional info!";
+            this.heyHintLabel.TextAlign = System.Drawing.ContentAlignment.BottomRight;
+            // 
+            // versionLabel
+            // 
+            this.versionLabel.AutoSize = true;
+            this.versionLabel.Location = new System.Drawing.Point(672, 428);
+            this.versionLabel.Name = "versionLabel";
+            this.versionLabel.Size = new System.Drawing.Size(116, 13);
+            this.versionLabel.TabIndex = 27;
+            this.versionLabel.Text = "godot2aab version: 9.8";
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(800, 450);
+            this.Controls.Add(this.versionLabel);
+            this.Controls.Add(this.heyHintLabel);
+            this.Controls.Add(this.killJavaButton);
+            this.Controls.Add(this.progressLabel);
+            this.Controls.Add(this.progressBar);
             this.Controls.Add(this.removeConfigButton);
             this.Controls.Add(this.label1);
             this.Controls.Add(this.studioAskButton);
@@ -351,6 +409,11 @@
         private System.Windows.Forms.Button studioAskButton;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.Button removeConfigButton;
+        private System.Windows.Forms.ProgressBar progressBar;
+        private System.Windows.Forms.Label progressLabel;
+        private System.Windows.Forms.Button killJavaButton;
+        private System.Windows.Forms.Label heyHintLabel;
+        private System.Windows.Forms.Label versionLabel;
     }
 }
 

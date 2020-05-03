@@ -1,17 +1,22 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Xml.Linq;
 using IniParser;
 using IniParser.Model;
+
+/*
+ * Hello, this is the whole source code of godot2aab!
+ * Feel free to tinker as much as you want, send issues, pull requests, I won't mind!
+ * Huge thanks to iBotPeaches for APKTool and Godot team for Godot.
+ * meow.
+ */
+
 
 namespace godot2aab
 {
@@ -26,6 +31,8 @@ namespace godot2aab
         public string APKToolPath = "";
         public string StudioPath = "";
         public bool   DoSaveConfig = true;
+
+        // This function is pretty bad, it's designed to read output from process.
         public string ReadString(string path, string arg = "")
         {
             var procinfo = new ProcessStartInfo
@@ -38,7 +45,8 @@ namespace godot2aab
             };
             var proc = Process.Start(procinfo);
             string ret = proc.StandardOutput.ReadToEnd() + proc.StandardError.ReadToEnd();
-            proc.WaitForExit();
+            while (!proc.HasExited) Application.DoEvents();
+            //proc.WaitForExit();
             proc.Dispose();
             return ret;
         }
@@ -50,6 +58,12 @@ namespace godot2aab
 
         public void InitializeOther()
         {
+            // Detect our version.
+            string Version = Assembly.GetExecutingAssembly().GetName().Version.ToString().Substring(0, 3);
+            versionLabel.Text = versionLabel.Text.Replace("9.8", Version);
+
+            if (Debugger.IsAttached) Text += " (Running inside Visual Studio or debugger is attached)";
+
             print("Trying to find SDKs and Java...");
 
             var supposed_path = ReadString("where", "java");
@@ -73,7 +87,7 @@ namespace godot2aab
             LoadConfig();
 
             print();
-            print("godot2aab ready for you, user! meow.");
+            print("godot2aab version " + Version + " is ready for you, user! meow.");
         }
 
         public void print(string text = "")
@@ -88,9 +102,10 @@ namespace godot2aab
             Warning(); // TODO: remove later.
         }
 
+        // TODO: remove this later.
         private void Warning()
         {
-            if (!File.Exists(MyDir + "config.txt"))
+            if (!File.Exists(MyDir + ConfigFname))
             MessageBox.Show("This tool is in development. Always make backups of your projects. This warning will show only once.", "Please read this:", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
@@ -246,6 +261,7 @@ namespace godot2aab
             {
                 foreach (DirectoryInfo subdir in dirs)
                 {
+                    Application.DoEvents();
                     string temppath = Path.Combine(destDirName, subdir.Name);
                     DirectoryCopy(subdir.FullName, temppath, copySubDirs);
                 }
@@ -272,14 +288,93 @@ namespace godot2aab
             Directory.CreateDirectory(path);
         }
 
+
+        // Taken from https://github.com/godotengine/godot/blob/39f7a4092533a600eeada6638016af8bd4bd2271/platform/android/export/export.cpp#L424 and rewritten in C#
+        private string PatchPackageName(string p_package)
+        {
+            if (!p_package.Contains("$genname")) return p_package;
+            else
+            {
+                string pname = p_package;
+                string basename = string.Empty;
+                string name = string.Empty;
+                string[] cfg = File.ReadAllLines(ProjectDirPath + "project.godot");
+                bool found = false;
+                for (int i = 0; i < cfg.Length; i++)
+                {
+                    string s = cfg[i];
+                    if (s.StartsWith("config/name=\""))
+                    {
+                        found = true;
+                        s = s.Replace("config/name=\"", string.Empty).TrimEnd('"').ToLower();
+                        basename = s;
+                        break;
+                    }
+                }
+                if (!found || basename == string.Empty) basename = "noname";
+
+                var basecharname = basename.ToCharArray();
+                bool first = true;
+                for (int j = 0; j < basecharname.Length; j++)
+                {
+                    var c = basecharname[j];
+                    if (c >= '0' && c <= '9' && first) {
+                        continue;
+                    }
+                    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+                        name += c.ToString();
+                        first = false;
+                    }
+                }
+
+                pname = pname.Replace("$genname", name);
+
+                return pname;
+            }
+        }
+
+        private bool CheckBeforeBuild()
+        {
+            bool pass = true;
+
+            // Try to check everything.
+            if (!File.Exists(APKToolPath))
+            {
+                MessageBox.Show("Cannot find APKTool jar file, make sure your path is correct!", "Oh no.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                pass = false;
+            }
+            else if (!File.Exists(GameAPKPath))
+            {
+                MessageBox.Show("Cannot find game apk file, make sure your path is correct!", "Oh no.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                pass = false;
+            }
+            else if (!File.Exists(ProjectDirPath + "project.godot"))
+            {
+                MessageBox.Show("Cannot find project file, make sure your path is correct!", "Oh no.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                pass = false;
+            }
+            else if (!File.Exists(StudioPath) && checkBoxStudio.Checked) // it's okay if you want to use Gradle from command line, but not okay when you WANT to use Android Studio.
+            {
+                MessageBox.Show("Cannot find Android Studio executable, make sure your path is correct!", "Oh no.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                pass = false;
+            }
+
+            return pass;
+        }
+
         private void DoBuild()
         {
             // oh no.
 
+            if (!CheckBeforeBuild()) return;
+
             buttonDoit.Enabled = false;
             cleanTempDirsButton.Enabled = false;
 
+            InitProgressBar(15);
+
             print("Starting build...");
+            DoProgress(1);
 
             string tempDir = Path.GetTempPath() + GetRandomNumber().ToString() + Path.DirectorySeparatorChar;
 
@@ -288,15 +383,18 @@ namespace godot2aab
             IniData data = iniparser.ReadFile(ProjectDirPath + "export_presets.cfg");
 
             print("Parsing export_presets.cfg...");
+            DoProgress(2);
 
             foreach (var section in data.Sections)
             {
+                Application.DoEvents();
                 if (section.Keys.ContainsKey("platform"))
                 {
                     if (section.Keys["platform"] == "\"Android\"")
                     {
                         // Names
                         packageName = data[section.SectionName + ".options"]["package/unique_name"].Replace("\"", string.Empty);
+                        packageName = PatchPackageName(packageName);
                         appName = data[section.SectionName + ".options"]["package/name"].Replace("\"", string.Empty);
 
                         // Version info
@@ -330,14 +428,34 @@ namespace godot2aab
             }
 
             print("Patching gradle files...");
-            ReCreateDir(gradlePath + "aab");
+            DoProgress(3);
+
+            //Trying to recreate our project directory.
+            bool fail;
+            try
+            {
+                ReCreateDir(gradlePath + "aab");
+                fail = false;
+            }
+            catch
+            {
+                Application.DoEvents();
+                MessageBox.Show("Cannot recreate 'buildaab' directory. Make sure no process is blocking godot2aab from deleting it.", "Error.", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                progressBar.Value = 0;
+                buttonDoit.Enabled = true;
+                cleanTempDirsButton.Enabled = true;
+                fail = true;
+            }
+            if (fail) return;
+
             if (checkBoxBackup.Checked)
             {
                 DirectoryCopy(gradlePath, gradlePath + "aab", true);
                 gradlePath += @"aab\";
             }
-            else gradlePath += @"\";
+            else gradlePath += Path.DirectorySeparatorChar;
 
+            DoProgress(4);
             string configGradle = File.ReadAllText(gradlePath + "config.gradle");
             var buildGradle = ReadAllList(gradlePath + "build.gradle");
             configGradle = configGradle.Replace("com.godot.game", packageName);
@@ -351,16 +469,19 @@ namespace godot2aab
             var man_declaration = manifest_xml.Element("manifest").GetNamespaceOfPrefix("android");
             manifest_xml.Element("manifest").Attribute(man_declaration + "versionCode").Value = versionCode;
             manifest_xml.Element("manifest").Attribute(man_declaration + "versionName").Value = versionName;
+            DoProgress(5);
 
             print("Writing patched files...");
             File.WriteAllText(gradlePath + "config.gradle", configGradle);
             WriteAllList(gradlePath + "build.gradle", buildGradle);
             File.WriteAllText(gradlePath + "AndroidManifest.xml", manifest_xml.ToString());
+            DoProgress(6);
 
             print("Patching GodotApp.java...");
             File.WriteAllText(gradlePath + @"src\com\godot\game\GodotApp.java",
                                 File.ReadAllText(gradlePath + @"src\com\godot\game\GodotApp.Java").Replace("package com.godot.game;","package " + packageName + ";")
                              );
+            DoProgress(7);
 
             print("Removing 'build' folder...");
             try
@@ -368,23 +489,28 @@ namespace godot2aab
                 Directory.Delete(gradlePath + "build", true);
             }
             catch { }
+            DoProgress(8);
 
             print("Renaming subdirs in 'src' directory...");
             var splitname = packageName.Split('.');
             Directory.Move(gradlePath + @"src\com\godot\game", gradlePath + @"src\com\godot\" + splitname[2]);
             Directory.Move(gradlePath + @"src\com\godot", gradlePath + @"src\com\" + splitname[1]);
             Directory.Move(gradlePath + @"src\com", gradlePath + @"src\" + splitname[0]);
+            DoProgress(9);
 
 
             print("Unpacking your game apk file for resources...");
             print("Invoking apktool.jar...");
 
-            string output = ReadString("java", "-jar " + APKToolPath + " d " + GameAPKPath + " -o " + tempDir);
+            string output = ReadString("java", "-jar \"" + APKToolPath + "\" d \"" + GameAPKPath + "\" -o " + tempDir);
             print(output);
+
+            DoProgress(10);
 
             print("Copying game assets to Gradle project folder...");
             DirectoryCopy(tempDir + "res", gradlePath + "res", true);
             DirectoryCopy(tempDir + "assets", gradlePath + "assets", true);
+            DoProgress(11);
 
             print("Fixing assets '.import' directory...");
             Directory.Move(gradlePath + @"assets\.import", gradlePath + @"assets\dotimport");
@@ -393,6 +519,7 @@ namespace godot2aab
                 Application.DoEvents();
                 File.WriteAllText(path, File.ReadAllText(path).Replace(".import", "dotimport"));
             }
+            DoProgress(12);
 
             print("Fixing attrs.xml in 'res' directory...");
             var attr_xml = XDocument.Load(gradlePath + @"res\values\attrs.xml");
@@ -401,6 +528,7 @@ namespace godot2aab
             //fontProviderFetchTimeout
             //fontStyle
             List<XElement> to_remove = new List<XElement>();
+
             foreach (var element in attr_xml.Root.Elements())
             {
                 string n = element.Attribute("name").Value; // name.
@@ -415,15 +543,22 @@ namespace godot2aab
                 xel.Remove();
             }
 
+            //Save our patched AndroidManifest.xml
             attr_xml.Save(gradlePath + @"res\values\attrs.xml");
 
             buttonDoit.Enabled = true;
             cleanTempDirsButton.Enabled = true;
 
+            DoProgress(13);
+
             if (checkBoxStudio.Checked) LaunchAndroidStudio(gradlePath);
             else BuildGradleAAB(gradlePath);
 
+            DoProgress(14);
+
             print("Build finished! Enjoy!");
+
+            DoProgress(15);
         }
 
         private void BuildGradleAAB(string arg)
@@ -432,15 +567,12 @@ namespace godot2aab
             var gradle = new ProcessStartInfo
             {
                 FileName = "cmd.exe",
-                Arguments = "/c \".\\gradlew.bat bundleRelease & pause\"",
+                Arguments = "/c \".\\gradlew.bat bundleRelease && explorer \"" + arg + @"build\outputs\bundle\release" + "\" & pause\"",
                 WorkingDirectory = arg,
                 UseShellExecute = true
             };
             var proc = Process.Start(gradle);
-            proc.WaitForExit();
             proc.Dispose();
-
-            Process.Start("explorer.exe", arg + @"build\outputs\bundle\release\");
         }
 
         private void LaunchAndroidStudio(string arg)
@@ -496,7 +628,11 @@ namespace godot2aab
         private void CheckPath(string path)
         {
             if (path.Contains(' '))
-            MessageBox.Show("Your path seems to contain spaces.\nThis *will* cause issues.\nPlease change it to a different folder.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Your path seems to contain spaces.\nThis *may* cause issues.\nIf you can, please change it to a different folder.",
+                                "Uhm...",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning);
+            // Seems to work with spaces actually, but still.
         }
 
         private int FindIndex(List<string> my_list, string need, int start = 0)
@@ -531,12 +667,13 @@ namespace godot2aab
             to_write = new string[0];
         }
 
-        
+        // Used for printing build.gradle when something breaks :p
         private void PrintStringList(List<string> my_arr)
         {
             for (int i = 0; i < my_arr.Count; i++)
             {
                 print(my_arr[i]);
+                Application.DoEvents();
             }
         }
         
@@ -592,13 +729,43 @@ thanks to - Godot team";
         {
             try
             {
-                File.Delete(MyDir + "config.txt");
+                File.Delete(MyDir + ConfigFname);
             }
             catch { }
 
             MessageBox.Show("Config removed, the program will exit.", "Hello!", MessageBoxButtons.OK, MessageBoxIcon.Information);
             DoSaveConfig = false;
             Application.Exit();
+        }
+
+        private void DoProgress(int step)
+        {
+            progressBar.Value = step;
+        }
+
+        private void InitProgressBar(int maximum)
+        {
+            progressBar.Maximum = maximum;
+        }
+
+        // Auto-scroll our LogBox.
+        private void LogBox_TextChanged(object sender, EventArgs e)
+        {
+            LogBox.SelectionStart = LogBox.Text.Length;
+            LogBox.ScrollToCaret();
+        }
+
+        private void killJavaButton_Click(object sender, EventArgs e)
+        {
+            print("Killing all java.exe processes...");
+            int count = 0;
+            foreach (var proc in Process.GetProcessesByName("java"))
+            {
+                proc.Kill();
+                count++;
+                Application.DoEvents();
+            }
+            print("Killed " + count.ToString() + " processes!");
         }
     }
 }
