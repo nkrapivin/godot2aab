@@ -184,11 +184,13 @@
             this.checkBoxBackup.AutoSize = true;
             this.checkBoxBackup.Checked = true;
             this.checkBoxBackup.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.checkBoxBackup.Enabled = false;
             this.checkBoxBackup.Location = new System.Drawing.Point(88, 188);
             this.checkBoxBackup.Name = "checkBoxBackup";
-            this.checkBoxBackup.Size = new System.Drawing.Size(337, 17);
+            this.checkBoxBackup.Size = new System.Drawing.Size(514, 17);
             this.checkBoxBackup.TabIndex = 12;
-            this.checkBoxBackup.Text = "Backup your template project and do all operations in a copy of it?";
+            this.checkBoxBackup.Text = "Backup your template project and do all operations in a copy of it? (causing prob" +
+    "lems when unchecked)";
             this.checkBoxBackup.UseVisualStyleBackColor = true;
             // 
             // buttonDoit

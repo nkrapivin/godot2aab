@@ -213,6 +213,7 @@ namespace godot2aab
             builtAPKTextbox.Text = GameAPKPath;
             apktoolPathTextbox.Text = APKToolPath;
             androidStudioTextbox.Text = StudioPath;
+            checkBoxBackup.Checked = true; // TODO: fix no-backup mode later.
         }
 
         private void buttonDoit_Click(object sender, EventArgs e)
@@ -380,7 +381,7 @@ namespace godot2aab
 
             gradlePath = ProjectDirPath + @"android\build";
             var iniparser = new FileIniDataParser();
-            IniData data = iniparser.ReadFile(ProjectDirPath + "export_presets.cfg");
+            IniData data = iniparser.ReadFile(ProjectDirPath + "export_presets.cfg", Encoding.UTF8);
 
             print("Parsing export_presets.cfg...");
             DoProgress(2);
@@ -493,9 +494,9 @@ namespace godot2aab
 
             print("Renaming subdirs in 'src' directory...");
             var splitname = packageName.Split('.');
-            Directory.Move(gradlePath + @"src\com\godot\game", gradlePath + @"src\com\godot\" + splitname[2]);
-            Directory.Move(gradlePath + @"src\com\godot", gradlePath + @"src\com\" + splitname[1]);
-            Directory.Move(gradlePath + @"src\com", gradlePath + @"src\" + splitname[0]);
+            if (splitname[2] != "game") Directory.Move(gradlePath + @"src\com\godot\game", gradlePath + @"src\com\godot\" + splitname[2]);
+            if (splitname[1] != "godot") Directory.Move(gradlePath + @"src\com\godot", gradlePath + @"src\com\" + splitname[1]);
+            if (splitname[0] != "com") Directory.Move(gradlePath + @"src\com", gradlePath + @"src\" + splitname[0]);
             DoProgress(9);
 
 
